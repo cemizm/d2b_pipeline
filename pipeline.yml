@@ -1,0 +1,21 @@
+steps:
+- name: Daten sammeln
+  docker:
+    buildConfiguration:
+        context: train/
+        dockerfile: dockerfile
+    command: python ingest.py
+- name: Vorverarbeitung
+  docker:
+    image: python:3
+    command: python prepare.py
+- name: Train
+  docker:
+    buildConfiguration:
+        context: train/
+        dockerfile: dockerfile
+    command: python train/train.py
+- name: Validate
+  docker:
+    image: python:3
+    command: python validate.py
