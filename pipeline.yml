@@ -3,7 +3,7 @@ steps:
   docker:
     buildConfiguration:
         context: ./dockerfiles/
-        dockerfile: ./dockerfiles/run.dockerfile
+        dockerfile: run.dockerfile
     command: python ingest.py
 - name: Vorverarbeitung
   docker:
