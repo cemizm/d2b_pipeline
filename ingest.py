@@ -48,18 +48,7 @@ print("Dark IV-Curves:\t\t\t{}".format(dark_count))
 
 print("-------------------- Loading Metadata ----------------------")
 
-metatypes = client_sm.get_meta_type()
-metadata = client_sm.get_meta_data()
-
-for id, group in metadata.groupby(["observedobject"]):
-    val = group[['val']]
-    val = val.rename(columns={"val": id})
-    metatypes = metatypes.join(val)
-
-metadata = metatypes.T
-metadata = metadata.rename(columns=metadata.iloc[0])
-metadata = metadata.drop(metadata.index[0])
-metadata = metadata.reset_index().rename(columns={"index": "string_id"}).set_index(["string_id"])
+metadata = client_sm.get_meta_dataframe_workaround()
 
 plants = oo[oo.type == sm.SM_TYPE_PLANT][['name']]
 strings = oo[(oo.type == sm.SM_TYPE_STRING) | (oo.type == sm.SM_TYPE_MODUL)][['name', 'parent']]
@@ -97,7 +86,7 @@ bright.to_csv("bright.csv")
 fragment = {
     'name': 'Metadaten',
     'filename': 'raw_metadata.csv',
-    'type': 1
+    'type': 2
 }
 
 with open('meta.csv', 'rb') as f:
@@ -106,7 +95,7 @@ with open('meta.csv', 'rb') as f:
 fragment = {
     'name': 'Dunkelkennlinien',
     'filename': 'raw_dark.csv',
-    'type': 1
+    'type': 2
 }
 
 with open('dark.csv', 'rb') as f:
@@ -115,7 +104,7 @@ with open('dark.csv', 'rb') as f:
 fragment = {
     'name': 'Hellkennlinien',
     'filename': 'raw_bright.csv',
-    'type': 1
+    'type': 2
 }
 
 with open('bright.csv', 'rb') as f:
