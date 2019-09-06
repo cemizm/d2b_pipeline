@@ -1,18 +1,114 @@
-import pvserve
-import pandas as pd
-import json
-import sys
+from pvserve import smartmonitoring as sm
+from pvserve import mlcycle as ml
+import os
 
-sm = pvserve.smartmonitoring.Client()
-data = sm.getData(3)
-dataset = pd.DataFrame(data['list'])
-observed_objects = sm.get_observed_objects()
+client_sm = sm.Client()
+client_ml = ml.Client()
 
-# 5 plant
-# 3 dunkel
-# 4 hell
-# 7 modul
-# 6 string
+print()
+print("---------------- Loading Observed Objects ------------------")
 
-pv_modules = sm.meta_to_file(observed_objects)
-sm.curves_to_file(observed_objects, pv_modules)
+oo = client_sm.get_objects()
+
+metadata = None
+curves = {}
+
+oo_data = oo[ (oo.type == sm.SM_TYPE_BRIGHT) | 
+              (oo.type == sm.SM_TYPE_DARK) ]
+
+print("Observed Objects:\t\t{}".format(len(oo.index)))
+print("IV Curve Objects:\t\t{}".format(len(oo_data.index)))
+
+print("------------------- Loading IV-Curves ----------------------")
+
+for index, row in oo_data.iterrows():
+    
+    df = client_sm.get_data(index)
+    if df is None:
+        continue
+
+    df.rename(columns={"id": "data_id"}, inplace=True)
+
+    df.insert(0, "string_id", row.parent)
+    df.set_index(["string_id", "data_id"], inplace=True)
+
+    if row.type not in curves:
+        curves[row.type] = df
+    else:
+        curves[row.type] = curves[row.type].append(df)
+
+dark = curves[sm.SM_TYPE_DARK]
+bright = curves[sm.SM_TYPE_BRIGHT]
+
+print("Bright IV-Curves:\t\t{}".format(len(bright.index)))
+print("Dark IV-Curves:\t\t\t{}".format(len(dark.index)))
+
+print("-------------------- Loading Metadata ----------------------")
+
+metatypes = client_sm.get_meta_type()
+metadata = client_sm.get_meta_data()
+
+for id, group in metadata.groupby(["observedobject"]):
+    val = group[['val']]
+    val = val.rename(columns={"val": id})
+    metatypes = metatypes.join(val)
+
+metadata = metatypes.T
+metadata = metadata.rename(columns=metadata.iloc[0])
+metadata = metadata.drop(metadata.index[0])
+metadata = metadata.reset_index().rename(columns={"index": "string_id"}).set_index(["string_id"])
+
+plants = oo[oo.type == sm.SM_TYPE_PLANT][['name']]
+strings = oo[(oo.type == sm.SM_TYPE_STRING) | (oo.type == sm.SM_TYPE_MODUL)][['name', 'parent']]
+strings = strings.reset_index().set_index(['parent'])
+header = strings.join(plants, lsuffix="_string", rsuffix="_plant")
+
+header = header.reset_index()
+header = header.rename(columns = { "index": "plant_id", 
+                                   "id": "string_id", 
+                                   "name_string": "string_name", 
+                                   "name_plant": "plant_name"
+                                })
+header = header.set_index(["string_id"])
+
+meta = header.join(metadata)
+
+print("Total Plants:\t\t\t{}".format(len(plants.index)))
+print("Total Strings:\t\t\t{}".format(len(strings.index)))
+
+print("-------------------- Upload to MLCycle ---------------------")
+
+meta.to_csv("meta.csv")
+dark.to_csv("dark.csv")
+bright.to_csv("bright.csv")
+
+fragment = {
+    'name': 'Metadaten',
+    'filename': 'metadata.csv',
+    'type': 1
+}
+
+with open('meta.csv', 'rb') as f:
+    client_ml.upload(fragment, f)
+
+fragment = {
+    'name': 'Dunkelkennlinien',
+    'filename': 'dark.csv',
+    'type': 1
+}
+
+with open('dark.csv', 'rb') as f:
+    client_ml.upload(fragment, f)
+
+fragment = {
+    'name': 'Hellkennlinien',
+    'filename': 'bright.csv',
+    'type': 1
+}
+
+with open('bright.csv', 'rb') as f:
+    client_ml.upload(fragment, f)
+
+os.remove("meta.csv")
+os.remove("dark.csv")
+os.remove("bright.csv")
