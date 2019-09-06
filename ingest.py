@@ -37,9 +37,6 @@ for index, row in oo_data.iterrows():
     else:
         curves[row.type] = curves[row.type].append(df)
 
-    if index > 10:
-        break
-
 dark = curves[sm.SM_TYPE_DARK]
 bright = curves[sm.SM_TYPE_BRIGHT]
 
