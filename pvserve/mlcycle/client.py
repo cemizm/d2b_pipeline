@@ -24,6 +24,19 @@ class Client:
                     f.write(data)
         else:
             self.client.Fragments.upload(fragment, fd)
+
+    def download(self, name, fd):
+        if self.client is None:
+            path = os.path.join("workdir", name)
+
+            with open(path, 'rb') as src:
+                while True:
+                    data = src.read(1024 * 1024)
+                    if not data:
+                        break
+                    fd.write(data)
+        else:
+            self.client.Fragments.getLatestByJob(name, fd)
     
     def add_metrics(self, metrics):
         if self.client is not None:

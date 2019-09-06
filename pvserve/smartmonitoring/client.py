@@ -85,3 +85,24 @@ class Client:
         df = df.set_index(["type"])
 
         return df
+
+    def get_meta_dataframe(self):
+        metatypes = self.get_meta_type()
+        metadata = self.get_meta_data()
+
+        for id, group in metadata.groupby(["observedobject"]):
+            val = group[['val']]
+            val = val.rename(columns={"val": id})
+            metatypes = metatypes.join(val)
+
+        metadata = metatypes.T
+        metadata = metadata.rename(columns=metadata.iloc[0])
+        metadata = metadata.drop(metadata.index[0])
+        metadata = metadata.reset_index().rename(columns={"index": "string_id"}).set_index(["string_id"])
+
+        return metadata
+
+    def get_meta_dataframe_workaround(self):
+        return pd.read_csv("pvserve/smartmonitoring/meta.csv", sep=";", index_col=[0])
+
+        

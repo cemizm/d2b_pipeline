@@ -1,4 +1,4 @@
-﻿String_id;Modulneigung;Modulausrichtung;Anzahl Module in Serie;Anzahl Module parallel;Modulhersteller;Modultyp;Modulleistung;Anzahl Moduldosen;Anzahl Bypassdioden;Modularchitektur;Zelltyp;Baujahr;Bemerkungen
+﻿string_id;Modulneigung;Modulausrichtung;Anzahl Module in Serie;Anzahl Module parallel;Modulhersteller;Modultyp;Modulleistung;Anzahl Moduldosen;Anzahl Bypassdioden;Modularchitektur;Zelltyp;Baujahr;Bemerkungen
 7;22°;180°;1;1;Firstsolar;FS-382;82,5 Wp;1;0;cds/cdte Halbleiter,  154 aktive Solarzellen;Dünschicht;1984;Einzelmodulmessung
 24;15°;225°;20;1;Kyocera;KC180;180Wp;1;3;"48 Zeller 6"" Zellkantenlänge poly";poly;2011;Solarpark Sonnenwerk I Strang 25A
 27;15°;185°;22;1;Winaico;WST-250P6;250Wp;1;3;"60 Zeller 6"" Zellkantenlänge poly";poly;??;
