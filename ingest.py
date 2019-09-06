@@ -40,8 +40,11 @@ for index, row in oo_data.iterrows():
 dark = curves[sm.SM_TYPE_DARK]
 bright = curves[sm.SM_TYPE_BRIGHT]
 
-print("Bright IV-Curves:\t\t{}".format(len(bright.index)))
-print("Dark IV-Curves:\t\t\t{}".format(len(dark.index)))
+dark_count = len(dark.index)
+bright_count = len(bright.index)
+
+print("Bright IV-Curves:\t\t{}".format(bright_count))
+print("Dark IV-Curves:\t\t\t{}".format(dark_count))
 
 print("-------------------- Loading Metadata ----------------------")
 
@@ -72,11 +75,20 @@ header = header.rename(columns = { "index": "plant_id",
 header = header.set_index(["string_id"])
 
 meta = header.join(metadata)
+plants_count = len(plants.index)
+string_count = len(strings.index)
 
-print("Total Plants:\t\t\t{}".format(len(plants.index)))
-print("Total Strings:\t\t\t{}".format(len(strings.index)))
+print("Total Plants:\t\t\t{}".format(plants_count))
+print("Total Strings:\t\t\t{}".format(string_count))
 
 print("-------------------- Upload to MLCycle ---------------------")
+
+client_ml.add_metrics({
+    'Plants': plants_count,
+    'Strings': string_count,
+    'Bright IV-Curves': bright_count,
+    'Dark IV-Curves': dark_count
+})
 
 meta.to_csv("meta.csv")
 dark.to_csv("dark.csv")
@@ -84,7 +96,7 @@ bright.to_csv("bright.csv")
 
 fragment = {
     'name': 'Metadaten',
-    'filename': 'metadata.csv',
+    'filename': 'raw_metadata.csv',
     'type': 1
 }
 
@@ -93,7 +105,7 @@ with open('meta.csv', 'rb') as f:
 
 fragment = {
     'name': 'Dunkelkennlinien',
-    'filename': 'dark.csv',
+    'filename': 'raw_dark.csv',
     'type': 1
 }
 
@@ -102,7 +114,7 @@ with open('dark.csv', 'rb') as f:
 
 fragment = {
     'name': 'Hellkennlinien',
-    'filename': 'bright.csv',
+    'filename': 'raw_bright.csv',
     'type': 1
 }
 

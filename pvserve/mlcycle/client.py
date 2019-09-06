@@ -24,3 +24,8 @@ class Client:
                     f.write(data)
         else:
             self.client.Fragments.upload(fragment, f)
+    
+    def add_metrics(self, metrics):
+        if self.client is not None:
+            self.client.Jobs.addMetrics(metrics)
+        
