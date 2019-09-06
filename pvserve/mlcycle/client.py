@@ -23,7 +23,7 @@ class Client:
                         break
                     f.write(data)
         else:
-            self.client.Fragments.upload(fragment, f)
+            self.client.Fragments.upload(fragment, fd)
     
     def add_metrics(self, metrics):
         if self.client is not None:
