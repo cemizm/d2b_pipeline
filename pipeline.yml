@@ -2,8 +2,8 @@ steps:
 - name: Daten sammeln
   docker:
     buildConfiguration:
-        context: dockerfiles/
-        dockerfile: dockerfiles/run.dockerfile
+        context: ./dockerfiles/
+        dockerfile: ./dockerfiles/run.dockerfile
     command: python ingest.py
 - name: Vorverarbeitung
   docker:
