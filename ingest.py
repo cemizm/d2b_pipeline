@@ -1,9 +1,13 @@
 from pvserve import smartmonitoring as sm
 from pvserve import mlcycle as ml
+from pvserve import moduldb as mdb
+
+import pandas as pd
 import os
 
 client_sm = sm.Client()
 client_ml = ml.Client()
+client_mdb = mdb.Client()
 
 print()
 print("---------------- Loading Observed Objects ------------------")
@@ -40,6 +44,9 @@ for index, row in oo_data.iterrows():
 dark = curves[sm.SM_TYPE_DARK]
 bright = curves[sm.SM_TYPE_BRIGHT]
 
+dark['Uoc'] = dark[sm.SM_CURVE_U].max(axis=1)
+dark['Isc'] = dark[sm.SM_CURVE_I].max(axis=1)
+
 dark_count = len(dark.index)
 bright_count = len(bright.index)
 
@@ -64,6 +71,24 @@ header = header.rename(columns = { "index": "plant_id",
 header = header.set_index(["string_id"])
 
 meta = header.join(metadata)
+
+mdb = None
+for elem in meta.Modultyp.unique():
+    if elem is None:
+        continue
+    data = client_mdb.get_modul_data(elem)
+    data = pd.DataFrame(data)
+    if mdb is None:
+        mdb = data
+    else:
+        mdb = mdb.append(data)
+
+mdb = mdb.reset_index(drop = True)
+mdb = mdb.set_index('Modultyp')
+mdb = mdb.drop(columns=['Modulhersteller'])
+
+meta = meta.join(mdb, on="Modultyp")
+
 plants_count = len(plants.index)
 string_count = len(strings.index)
 
@@ -79,37 +104,6 @@ client_ml.add_metrics({
     'Dark IV-Curves': dark_count
 })
 
-meta.to_csv("meta.csv")
-dark.to_csv("dark.csv")
-bright.to_csv("bright.csv")
-
-fragment = {
-    'name': 'Metadaten',
-    'filename': 'raw_metadata.csv',
-    'type': 2
-}
-
-with open('meta.csv', 'rb') as f:
-    client_ml.upload(fragment, f)
-
-fragment = {
-    'name': 'Dunkelkennlinien',
-    'filename': 'raw_dark.csv',
-    'type': 2
-}
-
-with open('dark.csv', 'rb') as f:
-    client_ml.upload(fragment, f)
-
-fragment = {
-    'name': 'Hellkennlinien',
-    'filename': 'raw_bright.csv',
-    'type': 2
-}
-
-with open('bright.csv', 'rb') as f:
-    client_ml.upload(fragment, f)
-
-os.remove("meta.csv")
-os.remove("dark.csv")
-os.remove("bright.csv")
+client_ml.upload_dataframe(meta, 'Metadaten', 'raw_metadata.csv', 2)
+client_ml.upload_dataframe(dark, 'Dunkelkennlinien', 'raw_dark.csv', 2)
+client_ml.upload_dataframe(bright, 'Hellkennlinien', 'raw_bright.csv', 2)

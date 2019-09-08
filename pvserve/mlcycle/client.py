@@ -1,5 +1,6 @@
 import os
 import mlcycle
+import pandas as pd
 
 class Client:
     client=None
@@ -25,6 +26,30 @@ class Client:
         else:
             self.client.Fragments.upload(fragment, fd)
 
+    def upload_frag(self, name, filename, type):
+
+        fragment = {
+            'name': name,
+            'filename': filename,
+            'type': type
+        }
+
+        with open(filename, 'rb') as f:
+            self.upload(fragment, f)
+
+        os.remove(filename)
+
+
+    def upload_dataframe(self, df, name, filename, type):
+        df.to_csv(filename)
+
+        self.upload_frag(name, filename, type)
+
+    def upload_plot(self, fig, name, filename, type):
+        fig.savefig(filename)
+
+        self.upload_frag(name, filename, type)
+
     def download(self, name, fd):
         if self.client is None:
             path = os.path.join("workdir", name)
@@ -37,6 +62,17 @@ class Client:
                     fd.write(data)
         else:
             self.client.Fragments.getLatestByJob(name, fd)
+
+    def download_dataframe(self, name, **kwargs):
+        with open(name, "wb") as f:
+            self.download(name, f)
+        
+        df = pd.read_csv(name, **kwargs)
+
+        os.remove(name)
+
+        return df
+
     
     def add_metrics(self, metrics):
         if self.client is not None:
