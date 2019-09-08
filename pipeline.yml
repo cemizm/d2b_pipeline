@@ -7,7 +7,9 @@ steps:
     command: python ingest.py
 - name: Vorverarbeitung
   docker:
-    image: python:3
+    buildConfiguration:
+        context: ./dockerfiles/
+        dockerfile: run.dockerfile
     command: python prepare.py
 - name: Train
   docker:
