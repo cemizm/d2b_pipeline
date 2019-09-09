@@ -44,6 +44,8 @@ for index, row in oo_data.iterrows():
 dark = curves[sm.SM_TYPE_DARK]
 bright = curves[sm.SM_TYPE_BRIGHT]
 
+dark[sm.SM_CURVE_I] = dark[sm.SM_CURVE_I].multiply(-1, axis="index")
+
 dark['Uoc'] = dark[sm.SM_CURVE_U].max(axis=1)
 dark['Isc'] = dark[sm.SM_CURVE_I].max(axis=1)
 

@@ -9,7 +9,7 @@ ingest:
 
 .PHONY:prepare
 prepare:
-	docker run -it --rm -v $(PWD)/:/src pvserve:runtime python prepare2.py
+	docker run -it --rm -v $(PWD)/:/src pvserve:runtime python prepare.py
 
 .PHONY:jupyter
 jupyter:
