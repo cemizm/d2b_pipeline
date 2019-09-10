@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import matplotlib.pyplot as plt
 
@@ -8,7 +9,7 @@ from pvserve import preprocessing as pp
 
 COLS_U = ['Uoc', *sm.SM_CURVE_U]
 COLS_I = ['Isc', *sm.SM_CURVE_I]
-COLS_ERROR = ["plant_name", "string_name", "Anzahl Module in Serie", "Uoc_meta", "Isc_meta"]
+COLS_ERROR = ["plant_name", "string_name", "Anzahl Module in Serie", "Uoc", "Isc", "Uoc_meta", "Isc_meta"]
 
 ISC_UOC_TOLERANCE = 1.1
 
@@ -112,10 +113,37 @@ client_ml.upload_plot(fig, "Data Distribution (Dunkel)", "dd_dark.png", 0)
 
 print("---------------------- Interpolation -----------------------")
 
-for index, row in dark_meta.iterrows():
-    d = pp.interpolate(row[sm.SM_CURVE_U].values, 
-                       row[sm.SM_CURVE_I].values, 
-                       INTERPOLATE_X)
+print("Interpolation Points:\t\t{}".format(INTERPOLATE_X))
+
+dark_meta = pp.interpolate(dark_meta, sm.SM_CURVE_U, sm.SM_CURVE_I, size=INTERPOLATE_X)
+bright_meta = pp.interpolate(bright_meta, sm.SM_CURVE_U, sm.SM_CURVE_I, size=INTERPOLATE_X)
+
+bright_meta = bright_meta.drop(bright_meta[bright_meta['IV' + str(INTERPOLATE_X)] > 0.4].index)
+
+#plot interpolated curves
+
+fig, ax = plt.subplots(figsize=(18, 10))
+
+max_isc = pp.max_per_string(dark_meta, 'Isc')
+pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
+
+ax.set_xlabel('Uoc (normalisiert)')
+ax.set_ylabel('Isc (normalisiert)')
+
+client_ml.upload_plot(fig, "Dunkelkennlinien", "dark_visual.png", 0)
+
+
+fig, ax = plt.subplots(figsize=(18, 10))
+
+max_isc = pp.max_per_string(bright_meta, 'Isc')
+pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
+
+ax.set_xlabel('Uoc (normalisiert)')
+ax.set_ylabel('Isc (normalisiert)')
+
+client_ml.upload_plot(fig, "Hellkennlinien", "bright_visual.png", 0)
+
+
 
     
     
