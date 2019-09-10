@@ -34,6 +34,10 @@ def normalize(df, cols_u, cols_i):
     df[cols_u] = df[cols_u].divide(df.Uoc_tol, axis="index")
     df[cols_i] = df[cols_i].divide(df.Isc_tol, axis="index")
 
+def normalize_bright(df, temp, irr):
+    df['Temp'] = df['T mod'] / temp
+    df['Irr'] = df['E eff'] / irr
+
 def get_iv_cols(size=20, min=0, max=1):
     div = max / (size - 1)
     cols = ["IV" + str(i) for i in range(1, size + 1)]
@@ -77,6 +81,24 @@ def plot(df, size, **kwargs):
     
     return df.plot(**kwargs)
 
+def merge(dark, bright):
+    dark = dark.reset_index().set_index("string_id")
+    bright = bright.reset_index().set_index("string_id").drop(columns=['plant_id'])
+
+    return pd.merge(dark, bright, on="string_id")
+
+def summarize(dark, bright):
+    dark = dark.groupby(['plant_name', 'string_name']).count()[['ts']]
+    bright = bright.groupby(['plant_name', 'string_name']).count()[['ts']]
+
+    dark.columns = ['dark']
+    bright.columns = ['bright']
+
+    total = dark.join(bright).fillna(0)
+    total.bright = total.bright.astype(int)
+    total['total'] = total.dark * total.bright
+
+    return total
     
 
 

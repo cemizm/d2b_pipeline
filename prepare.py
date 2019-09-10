@@ -16,6 +16,10 @@ ISC_UOC_TOLERANCE = 1.1
 FILTER_IRR = 300
 
 INTERPOLATE_X = 20
+INTERPOLATE_ERROR_BRIGHT = 0.4
+
+NORMALIZE_TEMP = 70
+NORMALIZE_IRR = 1367
 
 print("------------------ Download from MLCycle -------------------")
 
@@ -89,6 +93,8 @@ print("--------------------- Normalize Data -----------------------")
 pp.normalize(dark_meta, COLS_U, COLS_I)
 pp.normalize(bright_meta, COLS_U, COLS_I)
 
+pp.normalize_bright(bright_meta, NORMALIZE_TEMP, NORMALIZE_IRR)
+
 print("Remaining bright IV-Curves:\t{}".format(bright_meta.shape[0]))
 print("Remaining dark IV-Curves:\t{}".format(dark_meta.shape[0]))
 
@@ -97,19 +103,19 @@ fig, ax = plt.subplots(figsize=(18, 10))
 ax.scatter(bright_meta['E eff'], 
            (bright_meta['Uoc'] * bright_meta['Isc']))
 
-ax.set_xlabel('Einstrahlung')
-ax.set_ylabel('Watt @ Ideal (normalisiert)')
+ax.set_xlabel('Irradiance')
+ax.set_ylabel('Watt @ Ideal (normalized)')
 
-client_ml.upload_plot(fig, "Data Distribution", "dd_bright.png", 0)
+client_ml.upload_plot(fig, "Data Distribution (Bright)", "dd_bright.png", 0)
 
 fig, ax = plt.subplots(figsize=(18, 10))
 
 ax.scatter(dark_meta['Uoc'], dark_meta['Isc'])
 
-ax.set_xlabel('Uoc (normalisiert)')
-ax.set_ylabel('Isc (normalisiert)')
+ax.set_xlabel('Uoc (normalized)')
+ax.set_ylabel('Isc (normalized)')
 
-client_ml.upload_plot(fig, "Data Distribution (Dunkel)", "dd_dark.png", 0)
+client_ml.upload_plot(fig, "Data Distribution (Dark)", "dd_dark.png", 0)
 
 print("---------------------- Interpolation -----------------------")
 
@@ -118,7 +124,8 @@ print("Interpolation Points:\t\t{}".format(INTERPOLATE_X))
 dark_meta = pp.interpolate(dark_meta, sm.SM_CURVE_U, sm.SM_CURVE_I, size=INTERPOLATE_X)
 bright_meta = pp.interpolate(bright_meta, sm.SM_CURVE_U, sm.SM_CURVE_I, size=INTERPOLATE_X)
 
-bright_meta = bright_meta.drop(bright_meta[bright_meta['IV' + str(INTERPOLATE_X)] > 0.4].index)
+# Drop interpolation errors
+bright_meta = bright_meta.drop(bright_meta[bright_meta['IV' + str(INTERPOLATE_X)] > INTERPOLATE_ERROR_BRIGHT].index)
 
 #plot interpolated curves
 
@@ -127,10 +134,10 @@ fig, ax = plt.subplots(figsize=(18, 10))
 max_isc = pp.max_per_string(dark_meta, 'Isc')
 pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
 
-ax.set_xlabel('Uoc (normalisiert)')
-ax.set_ylabel('Isc (normalisiert)')
+ax.set_xlabel('U (normalized)')
+ax.set_ylabel('I (normalized)')
 
-client_ml.upload_plot(fig, "Dunkelkennlinien", "dark_visual.png", 0)
+client_ml.upload_plot(fig, "Dark IV-Curves", "dark_visual.png", 0)
 
 
 fig, ax = plt.subplots(figsize=(18, 10))
@@ -138,14 +145,25 @@ fig, ax = plt.subplots(figsize=(18, 10))
 max_isc = pp.max_per_string(bright_meta, 'Isc')
 pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
 
-ax.set_xlabel('Uoc (normalisiert)')
-ax.set_ylabel('Isc (normalisiert)')
+ax.set_xlabel('U (normalized)')
+ax.set_ylabel('I (normalized)')
 
-client_ml.upload_plot(fig, "Hellkennlinien", "bright_visual.png", 0)
+client_ml.upload_plot(fig, "Bright IV-Curves", "bright_visual.png", 0)
 
+print("-------------------- Merge training set --------------------")
 
+#remove overlapping meta columns
+sbright = bright_meta.drop(columns=[*meta.columns])
 
-    
-    
+combined = pp.merge(dark_meta, sbright)
 
-    
+summary = pp.summarize(dark_meta, bright_meta)
+
+print("Dataset size:\t\t\t{}".format(combined.shape[0]))
+
+client_ml.upload_dataframe(summary, 'Dataset Summary', 'dataset_summary.csv', 2)
+client_ml.upload_dataframe(combined, 'Dataset', 'dataset.csv', 2)
+
+client_ml.add_metrics({
+    'Dataset': combined.shape[0]
+})

@@ -106,6 +106,6 @@ client_ml.add_metrics({
     'Dark IV-Curves': dark_count
 })
 
-client_ml.upload_dataframe(meta, 'Metadaten', 'raw_metadata.csv', 2)
-client_ml.upload_dataframe(dark, 'Dunkelkennlinien', 'raw_dark.csv', 2)
-client_ml.upload_dataframe(bright, 'Hellkennlinien', 'raw_bright.csv', 2)
+client_ml.upload_dataframe(meta, 'Metadata', 'raw_metadata.csv', 2)
+client_ml.upload_dataframe(dark, 'Dark IV-Curves (raw)', 'raw_dark.csv', 2)
+client_ml.upload_dataframe(bright, 'Bright IV-Curves (raw)', 'raw_bright.csv', 2)
