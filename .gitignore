@@ -205,3 +205,4 @@ $RECYCLE.BIN/
 res/
 logs/
 mlp.model
+.keras
