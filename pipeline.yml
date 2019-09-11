@@ -11,3 +11,9 @@ steps:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
     command: python prepare.py
+- name: Training
+  docker:
+    buildConfiguration:
+        context: ./dockerfiles/
+        dockerfile: run.dockerfile
+    command: python train.py

@@ -13,7 +13,7 @@ COLS_ERROR = ["plant_name", "string_name", "Anzahl Module in Serie", "Uoc", "Isc
 
 ISC_UOC_TOLERANCE = 1.1
 
-FILTER_IRR = 300
+FILTER_IRR = 600
 
 INTERPOLATE_X = 20
 INTERPOLATE_ERROR_BRIGHT = 0.4
@@ -60,14 +60,14 @@ print("Dark IV-Curves Errors:\t\t{}".format(drop_dark_len))
 if drop_bright_len > 0:
     err = pp.group_by_string(bright_meta, drop_bright, COLS_ERROR)
 
-    client_ml.upload_dataframe(err, 'Errors Bright', 'error_bright.csv', 0)
+    client_ml.upload_dataframe(err, 'Errors Bright', 'error_bright.csv')
 
     bright_meta = bright_meta.drop(bright_meta[drop_bright].index)
 
 if drop_dark_len > 0:
     err = pp.group_by_string(dark_meta, drop_dark, COLS_ERROR)
 
-    client_ml.upload_dataframe(err, 'Errors Dark', 'error_dark.csv', 0)
+    client_ml.upload_dataframe(err, 'Errors Dark', 'error_dark.csv')
     
     dark_meta = dark_meta.drop(dark_meta[drop_dark].index)
 
@@ -106,7 +106,7 @@ ax.scatter(bright_meta['E eff'],
 ax.set_xlabel('Irradiance')
 ax.set_ylabel('Watt @ Ideal (normalized)')
 
-client_ml.upload_plot(fig, "Data Distribution (Bright)", "dd_bright.png", 0)
+client_ml.upload_plot(fig, "Data Distribution (Bright)", "dd_bright.png")
 
 fig, ax = plt.subplots(figsize=(18, 10))
 
@@ -115,7 +115,7 @@ ax.scatter(dark_meta['Uoc'], dark_meta['Isc'])
 ax.set_xlabel('Uoc (normalized)')
 ax.set_ylabel('Isc (normalized)')
 
-client_ml.upload_plot(fig, "Data Distribution (Dark)", "dd_dark.png", 0)
+client_ml.upload_plot(fig, "Data Distribution (Dark)", "dd_dark.png")
 
 print("---------------------- Interpolation -----------------------")
 
@@ -137,7 +137,7 @@ pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
 ax.set_xlabel('U (normalized)')
 ax.set_ylabel('I (normalized)')
 
-client_ml.upload_plot(fig, "Dark IV-Curves", "dark_visual.png", 0)
+client_ml.upload_plot(fig, "Dark IV-Curves", "dark_visual.png")
 
 
 fig, ax = plt.subplots(figsize=(18, 10))
@@ -148,12 +148,12 @@ pp.plot(max_isc, INTERPOLATE_X, ax=ax, legend=False, ylim=(0,1))
 ax.set_xlabel('U (normalized)')
 ax.set_ylabel('I (normalized)')
 
-client_ml.upload_plot(fig, "Bright IV-Curves", "bright_visual.png", 0)
+client_ml.upload_plot(fig, "Bright IV-Curves", "bright_visual.png")
 
 print("-------------------- Merge training set --------------------")
 
 #remove overlapping meta columns
-sbright = bright_meta.drop(columns=[*meta.columns])
+sbright = bright_meta.drop(columns=['Isc_meta', 'Uoc_meta', *meta.columns.drop(['Isc', 'Uoc'])])
 
 combined = pp.merge(dark_meta, sbright)
 
@@ -161,8 +161,8 @@ summary = pp.summarize(dark_meta, bright_meta)
 
 print("Dataset size:\t\t\t{}".format(combined.shape[0]))
 
-client_ml.upload_dataframe(summary, 'Dataset Summary', 'dataset_summary.csv', 2)
-client_ml.upload_dataframe(combined, 'Dataset', 'dataset.csv', 2)
+client_ml.upload_dataframe(summary, 'Dataset Summary', 'dataset_summary.csv')
+client_ml.upload_dataframe(combined, 'Dataset', 'dataset.csv')
 
 client_ml.add_metrics({
     'Dataset': combined.shape[0]

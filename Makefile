@@ -11,6 +11,10 @@ ingest:
 prepare:
 	docker run -it --rm -v $(PWD)/:/src pvserve:runtime python prepare.py
 
+.PHONY:train
+train:
+	docker run -it --rm -v $(PWD)/:/src pvserve:runtime python train.py
+
 .PHONY:jupyter
 jupyter:
 	docker run --rm -d --name pvservnb -p 10001:8888 -v $(PWD):/home/jovyan/ pvserve:notebook

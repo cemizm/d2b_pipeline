@@ -1,106 +1,105 @@
-import pandas as pd
-import pvserve
-import numpy
-import sys
-from time import time
-from tensorflow.keras import metrics
-from tensorflow.keras.callbacks import TensorBoard
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.models import load_model
-from sklearn.model_selection import train_test_split
+import logging, os
 
+from pvserve import mlcycle as ml
+from pvserve import preprocessing as pp
 
-data_file = "res/normalized_trainingsdata.csv"
-data = pd.read_csv(data_file)
-model_file_path = 'mlp.model'
+logging.disable(logging.WARNING)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-def training_target_data(dataframe):
-    training_columns = []
-    target_columns = []
-    for val in data.columns.values:
-        if "dark" in val and "max" not in val:
-            training_columns.append(val)
-        elif "bright" in val and "max" not in val:
-            target_columns.append(val)
-        elif "temp" == val:
-            training_columns.append(val)
-        elif "E eff" == val:
-            training_columns.append(val)
-    return dataframe[training_columns], dataframe[target_columns]
+IV_COLS = 20
 
-def train(training_data, training_data_target, hidden, batch_size, epochs, file_path=model_file_path, layer_count=2, activation_f='sigmoid'):
-    # Build model
-    model = Sequential()
-    # Add hidden layer to model and choose activation function for neurons
-    model.add(Dense(hidden, activation=activation_f, input_dim=training_data.shape[1], kernel_initializer='normal'))
-    for i in range(layer_count-1):
-        model.add(Dense(hidden, activation=activation_f, input_dim=hidden, kernel_initializer='normal'))
-    
-    # Add output layer
-    model.add(Dense(training_data_target.shape[1], kernel_initializer='normal'))
-    # Choose optimizer and loss function
-    model.compile(optimizer='adam', loss='mean_squared_error', metrics=[metrics.mse])
-    # Add Tensorboard, view logs by cmd: tensorboard --logdir=logs/
-    tensorboard = TensorBoard(log_dir="logs\{}".format(time()))
-    # Training
-    model.fit(training_data, training_data_target, batch_size=batch_size, epochs=epochs, callbacks=[tensorboard])
-    # Save model
-    model.save(file_path)
-    return file_path
+INDEXES, COLS = pp.get_iv_cols(IV_COLS)
 
-def predict(test_data, test_labels, lastModelFilePath=model_file_path):
-    # Laden des Neuronalen Netzes
-    model = load_model(lastModelFilePath)
+COLS_IV_X = [c + '_x' for c in COLS] # Dark Curve Labels
+COLS_IV_Y = [c + '_y' for c in COLS] # Bright Curve Labels
+COLS_IV_P = [c + '_p' for c in COLS] # Predict Curve Labels
+COLS_IV_T = [*COLS_IV_X, *COLS_IV_Y] # Ground Truth Curve Labels
 
-    # Testen des Neuronalen Netzes
-    error = model.evaluate(test_data, test_labels)
-    predictions = model.predict(test_data)
-    
-    # Berechnen der Werte
-    failures=[]
-    for idx in range(0, len(predictions)):
-        value = 100*(safe_div(predictions[idx].item(0), test_labels.values[idx].item(0))-1)
-        failures.append(value)
-    accuracy = 1 - error[0]
-    mean_square_error = error[1]
-    must_values = test_labels.values
-    return accuracy, mean_square_error, predictions, must_values, failures
+COLS_X = ["Temp", "Irr", *COLS_IV_X]
+COLS_Y = [*COLS_IV_Y, 'Uoc_y']
+COLS_P = [*COLS_IV_P, 'Uoc_p']
 
-def safe_div(x, y):
-    if y == 0:
-        return 0
-    return x / y
+PARAM_HIDDEN_LAYERS = 2
+PARAM_PER_LAYER_FACTOR = 2
+PARAM_EPOCHS = 10
+PARAM_BATCH_SIZE = 10
 
-traine, test = train_test_split(data, test_size=0.4)
+PARAM_OPTIMIZER = 'rmsprop'
 
-training_data, training_data_target = training_target_data(traine)
-test_data, test_data_target = training_target_data(test)
+print("------------------ Download from MLCycle -------------------")
 
-dv = pvserve.data_visualisation.Visualisation()
+client_ml = ml.Client()
 
-dv.plot_graph(training_data_target.head(), "bright")
-sys.exit()
+dataset = client_ml.download_dataframe("dataset.csv", low_memory=False)
 
-print(" ")
-null_columns=training_data.columns[training_data.isnull().any()]
-print(training_data[null_columns].isnull().sum())
-print(" ")
-null_columns2=training_data_target.columns[training_data_target.isnull().any()]
-print(training_data_target[null_columns2].isnull().sum())
-zero_columns = training_data_target.columns[(training_data_target == 0).any()]
-print(len(training_data_target[zero_columns]))
+dataset[COLS_IV_T] = dataset[COLS_IV_T].clip(-1, 1)
 
-train(training_data, training_data_target, hidden=20, batch_size=4, epochs=50, file_path=model_file_path, layer_count=2, activation_f='relu')
-accuracy, mean_square_error, predictions, must_values, failures = predict(pd.DataFrame(test_data), pd.DataFrame(test_data_target))
+ds_train, ds_test = pp.train_test_split(dataset, test_size=0.2)
 
-print("accuracy")
-print(accuracy)
-print("mean_square_error")
-print(mean_square_error)
-print("predictions")
-print(predictions)
-print("must_values")
-print(must_values)
-print("failures")
-print(failures)
+print("Train Dataset:\t\t\t{}".format(ds_train.shape[0]))
+print("Test Dataset:\t\t\t{}".format(ds_test.shape[0]))
+
+print("----------------------- Build model ------------------------")
+
+model = pp.build_model(input_size=len(COLS_X), 
+                       output_size=len(COLS_Y),
+                       hidden_layer=PARAM_HIDDEN_LAYERS,
+                       neurons_per_layer=(len(COLS_X) * PARAM_PER_LAYER_FACTOR),
+                       optimizer=PARAM_OPTIMIZER,
+                       activation='tanh')
+
+model.summary()
+print()
+
+print("Batch Size:\t\t\t{}".format(PARAM_BATCH_SIZE))
+print("Training Epochs:\t\t{}".format(PARAM_EPOCHS))
+
+history = model.fit(ds_train[COLS_X], 
+                    ds_train[COLS_Y], 
+                    epochs=PARAM_EPOCHS, 
+                    batch_size=PARAM_BATCH_SIZE, 
+                    shuffle=True, 
+                    validation_split=0.25, 
+                    verbose=0)
+
+client_ml.upload_model(model, "Tensorflow Model", "model.h5")
+
+fig = pp.plot_history(history)
+client_ml.upload_plot(fig, "Model loss", "model_loss.png")
+
+print()
+print("------------------------ Error Plot ------------------------")
+
+result = pp.predict(model=model, 
+                    dataset=dataset,
+                    cols_x=COLS_X,
+                    cols_predict=COLS_P)
+
+result = pp.calculate_rmse(dataset=result, 
+                           cols_predict=COLS_IV_P,
+                           cols_y=COLS_IV_Y)
+
+fig = pp.plot_scatter_bins(x=result['E eff'].values, 
+                           y=result['rmse'].values, 
+                           xlabel='Einstrahlung',
+                           ylabel='RMSE',
+                           xbinwidth=50,
+                           ybinwidth=0.001)
+
+client_ml.upload_plot(fig, "RMSE", "model_rmse.png")
+
+print("----------------------- Predictions ------------------------")
+result = pp.predict(model=model, 
+                    dataset=ds_test,
+                    cols_x=COLS_X,
+                    cols_predict=COLS_P)
+
+samples = result.sample(50)
+
+fig = pp.plot_curves(curves=samples,
+                     index=INDEXES,
+                     cols_source=COLS_IV_X,
+                     cols_target=COLS_IV_Y,
+                     cols_predict=COLS_IV_P)
+
+client_ml.upload_plot(fig, "Prediction Examples", "model_prediction.png")

@@ -40,13 +40,18 @@ class Client:
         os.remove(filename)
 
 
-    def upload_dataframe(self, df, name, filename, type):
+    def upload_dataframe(self, df, name, filename, type=1):
         df.to_csv(filename)
 
         self.upload_frag(name, filename, type)
 
-    def upload_plot(self, fig, name, filename, type):
+    def upload_plot(self, fig, name, filename, type=0):
         fig.savefig(filename)
+
+        self.upload_frag(name, filename, type)
+
+    def upload_model(self, model, name, filename, type=2):
+        model.save(filename)
 
         self.upload_frag(name, filename, type)
 
