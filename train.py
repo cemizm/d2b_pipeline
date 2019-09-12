@@ -71,7 +71,7 @@ print()
 print("------------------------ Error Plot ------------------------")
 
 result = pp.predict(model=model, 
-                    dataset=dataset,
+                    dataset=ds_test,
                     cols_x=COLS_X,
                     cols_predict=COLS_P)
 
