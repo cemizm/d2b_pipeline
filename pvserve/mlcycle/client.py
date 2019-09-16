@@ -2,6 +2,8 @@ import os
 import mlcycle
 import pandas as pd
 
+from tensorflow.keras.models import load_model
+
 class Client:
     client=None
 
@@ -77,6 +79,17 @@ class Client:
         os.remove(name)
 
         return df
+
+    def download_model(self, name):
+        with open(name, "wb") as f:
+            self.download(name, f)
+
+        model = load_model(name)
+
+        os.remove(name)
+
+        return model
+
 
     
     def add_metrics(self, metrics):

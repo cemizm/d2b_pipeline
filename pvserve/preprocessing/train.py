@@ -8,14 +8,29 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
 def train_test_split(dataset, test_size=0.2):
-    msk = np.random.rand(len(dataset)) < test_size
+    weights = pd.DataFrame(index = dataset.string_id.unique()).sort_index()
 
-    train = dataset[~msk].reset_index()
-    test = dataset[msk].reset_index()
+    weights['weights'] = dataset.groupby(['string_id']).count()['data_id_x'].sort_index()
+    weights.weights = 1 - (weights.weights / weights.weights.sum())
+    weights.weights = weights.weights / weights.weights.sum()
+
+    weights = dataset[['string_id']].join(weights.weights, on="string_id").weights
+
+    test = dataset.sample(frac=test_size, random_state=130684)#, weights=weights)
+    train = dataset.drop(test.index).reset_index()
+    
+    test = test.reset_index()
 
     return train, test
 
-def build_model(input_size, output_size, hidden_layer, neurons_per_layer, optimizer='rmsprop', activation='tanh', loss='mse', metrics=['accuracy']):
+def build_model(input_size, 
+                output_size, 
+                hidden_layer, 
+                neurons_per_layer, 
+                optimizer='rmsprop', 
+                activation='tanh', 
+                loss='mse', 
+                metrics=['accuracy']):
     model = Sequential()
 
     model.add(Dense(neurons_per_layer, activation=activation, input_shape=(input_size,)))
@@ -43,11 +58,11 @@ def calculate_rmse(dataset, cols_predict, cols_y, col_rmse='rmse'):
     result[col_rmse] = 0
 
     cols = len(cols_predict)
-    for i in range(1, cols):
+    for i in range(0, cols):
         error = dataset[cols_y[i]] - dataset[cols_predict[i]]
         result[col_rmse] += error ** 2
 
-    result[col_rmse] = (result[col_rmse] / len(dataset)) **.5
+    result[col_rmse] = (result[col_rmse] / cols) **.5
 
     return dataset.join(result)
 
@@ -85,6 +100,13 @@ def plot_scatter_bins(x, y, xlabel, ylabel, xbinwidth = 50, ybinwidth = 0.001):
 
     bins = axr.hist(y, bins=ybins, orientation='horizontal', weights=np.ones(len(y)) / len(y), rwidth=0.8)
     bins = axt.hist(x, bins=xbins, orientation='vertical', weights=np.ones(len(x)) / len(x), rwidth=0.8)
+
+    return fig
+
+def plot_scatter_joint(dataset, x, y):
+    fig, ax = plt.subplots(figsize=(18, 15))
+
+    sns.jointplot(x='E eff', y='rmse', data=result, ax=ax)
 
     return fig
 

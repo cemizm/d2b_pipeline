@@ -32,8 +32,6 @@ client_ml = ml.Client()
 
 dataset = client_ml.download_dataframe("dataset.csv", low_memory=False)
 
-dataset[COLS_IV_T] = dataset[COLS_IV_T].clip(-1, 1)
-
 ds_train, ds_test = pp.train_test_split(dataset, test_size=0.2)
 
 print("Train Dataset:\t\t\t{}".format(ds_train.shape[0]))
@@ -89,17 +87,24 @@ fig = pp.plot_scatter_bins(x=result['E eff'].values,
 client_ml.upload_plot(fig, "RMSE", "model_rmse.png")
 
 print("----------------------- Predictions ------------------------")
-result = pp.predict(model=model, 
-                    dataset=ds_test,
-                    cols_x=COLS_X,
-                    cols_predict=COLS_P)
 
-samples = result.sample(50)
+samples = result.sort_values(['rmse'])
+top20 = samples.head(20)
+worst20 = samples.tail(20)
 
-fig = pp.plot_curves(curves=samples,
+fig = pp.plot_curves(curves=top20,
                      index=INDEXES,
                      cols_source=COLS_IV_X,
                      cols_target=COLS_IV_Y,
                      cols_predict=COLS_IV_P)
 
-client_ml.upload_plot(fig, "Prediction Examples", "model_prediction.png")
+client_ml.upload_plot(fig, "Top 20 Predictions", "top20_prediction.png")
+
+
+fig = pp.plot_curves(curves=worst20,
+                     index=INDEXES,
+                     cols_source=COLS_IV_X,
+                     cols_target=COLS_IV_Y,
+                     cols_predict=COLS_IV_P)
+
+client_ml.upload_plot(fig, "Worst 20 Predictions", "worst20_prediction.png")

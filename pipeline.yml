@@ -5,6 +5,12 @@ steps:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
     command: python ingest.py
+- name: Exploration
+  docker:
+    buildConfiguration:
+        context: ./dockerfiles/
+        dockerfile: run.dockerfile
+    command: python explore.py
 - name: Vorverarbeitung
   docker:
     buildConfiguration:

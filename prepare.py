@@ -1,6 +1,3 @@
-import pandas as pd
-import numpy as np
-import os
 import matplotlib.pyplot as plt
 
 from pvserve import mlcycle as ml
@@ -9,11 +6,8 @@ from pvserve import preprocessing as pp
 
 COLS_U = ['Uoc', *sm.SM_CURVE_U]
 COLS_I = ['Isc', *sm.SM_CURVE_I]
-COLS_ERROR = ["plant_name", "string_name", "Anzahl Module in Serie", "Uoc", "Isc", "Uoc_meta", "Isc_meta"]
 
 ISC_UOC_TOLERANCE = 1.1
-
-FILTER_IRR = 600
 
 INTERPOLATE_X = 20
 INTERPOLATE_ERROR_BRIGHT = 0.4
@@ -21,19 +15,15 @@ INTERPOLATE_ERROR_BRIGHT = 0.4
 NORMALIZE_TEMP = 70
 NORMALIZE_IRR = 1367
 
+INDEXES, COLS = pp.get_iv_cols(INTERPOLATE_X)
+
 print("------------------ Download from MLCycle -------------------")
 
 client_ml = ml.Client()
 
-meta = client_ml.download_dataframe("raw_metadata.csv", index_col=[0, 1])
-dark = client_ml.download_dataframe("raw_dark.csv", index_col=[0, 1])
-bright = client_ml.download_dataframe("raw_bright.csv", index_col=[0, 1])
-
-dark_count = len(dark.index)
-bright_count = len(bright.index)
-
-print("Bright IV-Curves:\t\t{}".format(bright_count))
-print("Dark IV-Curves:\t\t\t{}".format(dark_count))
+meta = client_ml.download_dataframe("metadata.csv", index_col=[0, 1])
+dark = client_ml.download_dataframe("clean_dark.csv", index_col=[0, 1])
+bright = client_ml.download_dataframe("clean_bright.csv", index_col=[0, 1])
 
 ### Prepare data
 
@@ -43,50 +33,11 @@ meta["Isc_tol"] = meta.Isc * ISC_UOC_TOLERANCE
 dark_meta = dark.join(meta, rsuffix="_meta")
 bright_meta = bright.join(meta, rsuffix="_meta")
 
-pp.standardize(dark_meta, COLS_U, COLS_I)
-pp.standardize(bright_meta, COLS_U, COLS_I)
+dark_count = len(dark.index)
+bright_count = len(bright.index)
 
-print("-------------------- Sanity Check Data ---------------------")
-
-drop_bright = pp.check(bright_meta)
-drop_dark = pp.check(dark_meta)
-
-drop_dark_len = len(drop_dark[drop_dark == True])
-drop_bright_len = len(drop_bright[drop_bright == True])
-
-print("Bright IV-Curve Errors:\t\t{}".format(drop_bright_len))
-print("Dark IV-Curves Errors:\t\t{}".format(drop_dark_len))
-
-if drop_bright_len > 0:
-    err = pp.group_by_string(bright_meta, drop_bright, COLS_ERROR)
-
-    client_ml.upload_dataframe(err, 'Errors Bright', 'error_bright.csv')
-
-    bright_meta = bright_meta.drop(bright_meta[drop_bright].index)
-
-if drop_dark_len > 0:
-    err = pp.group_by_string(dark_meta, drop_dark, COLS_ERROR)
-
-    client_ml.upload_dataframe(err, 'Errors Dark', 'error_dark.csv')
-    
-    dark_meta = dark_meta.drop(dark_meta[drop_dark].index)
-
-print("---------------------- Filter Data -------------------------")
-
-bfilter = pp.filter(bright_meta, FILTER_IRR)
-dfilter = pp.filter_typ(dark_meta)
-
-filter_blen = len(bfilter[bfilter == True])
-filter_dlen = len(dfilter[dfilter == True])
-
-if filter_blen > 0:
-    print("Low Irr. IV-Curves:\t\t{}".format(filter_blen))
-    bright_meta = bright_meta.drop(bright_meta[bfilter].index)
-
-if filter_blen > 0:
-    print("Daylight on dark IV-Curves:\t{}".format(filter_dlen))
-    dark_meta = dark_meta.drop(dark_meta[dfilter].index)
-
+print("Bright IV-Curves:\t\t{}".format(bright_count))
+print("Dark IV-Curves:\t\t\t{}".format(dark_count))
 
 print("--------------------- Normalize Data -----------------------")
 
@@ -94,9 +45,6 @@ pp.normalize(dark_meta, COLS_U, COLS_I)
 pp.normalize(bright_meta, COLS_U, COLS_I)
 
 pp.normalize_bright(bright_meta, NORMALIZE_TEMP, NORMALIZE_IRR)
-
-print("Remaining bright IV-Curves:\t{}".format(bright_meta.shape[0]))
-print("Remaining dark IV-Curves:\t{}".format(dark_meta.shape[0]))
 
 fig, ax = plt.subplots(figsize=(18, 10))
 
@@ -127,8 +75,11 @@ bright_meta = pp.interpolate(bright_meta, sm.SM_CURVE_U, sm.SM_CURVE_I, size=INT
 # Drop interpolation errors
 bright_meta = bright_meta.drop(bright_meta[bright_meta['IV' + str(INTERPOLATE_X)] > INTERPOLATE_ERROR_BRIGHT].index)
 
-#plot interpolated curves
+# Clip to -1 - 1
+dark_meta[COLS] = dark_meta[COLS].clip(-1, 1)
+bright_meta[COLS] = bright_meta[COLS].clip(-1, 1)
 
+#plot interpolated curves
 fig, ax = plt.subplots(figsize=(18, 10))
 
 max_isc = pp.max_per_string(dark_meta, 'Isc')

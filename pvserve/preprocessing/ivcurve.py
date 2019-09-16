@@ -1,15 +1,29 @@
 import pandas as pd
 import numpy as np
 
-def check(df):
-    err = df.Uoc_meta.isnull() 
-    err = err | df.Isc_meta.isnull()
-    err = err | (df.Uoc > df.Uoc_tol) 
-    err = err | (df.Isc > df.Isc_tol)
-    err = err | (df.Uoc < 0)
-    err = err | (df.Isc < 0)
+def check(df, irradiance):
+    result = pd.DataFrame(df[['plant_name', 'string_name']])
 
-    return err
+    result['total'] = True
+    result['remove'] = False
+    result['remaining'] = True
+
+    result['missing_meta']  = df.Uoc_meta.isnull() | df.Isc_meta.isnull()
+    result['Uoc_gt_meta']   = df.Uoc > df.Uoc_tol
+    result['Isc_gt_meta']   = df.Isc > df.Isc_tol
+    result['Uoc_lt_zero']   = df.Uoc < 0
+    result['Isc_lt_zero']   = df.Isc < 0
+
+    if 'E eff' in df:
+        result['low_irr'] = df['E eff'] < irradiance
+
+    if 'Kennlinientyp' in df:
+        result['is_bright'] = df['Kennlinientyp'] == 'bright'
+
+    result['remove'] = result.iloc[:,5:].any(axis=1)
+    result['remaining'] = ~result['remove']
+
+    return result
 
 def group_by_string(df, rows, cols):
     grp = df[rows][cols]
@@ -21,14 +35,6 @@ def group_by_string(df, rows, cols):
 def standardize(df, cols_u, cols_i):
     df[cols_u] = df[cols_u].divide(df["Anzahl Module in Serie"], axis="index")
     df[cols_i] = df[cols_i].divide(df["Anzahl Module parallel"], axis="index")
-
-def filter(df, irradiance):
-    filter = df['E eff'] <= irradiance
-    return filter
-
-def filter_typ(df):
-    filter = df.Kennlinientyp == "bright"
-    return filter
 
 def normalize(df, cols_u, cols_i):
     df[cols_u] = df[cols_u].divide(df.Uoc_tol, axis="index")
