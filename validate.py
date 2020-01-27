@@ -1,4 +1,5 @@
 import logging, os
+import pandas as pd
 
 from pvserve import mlcycle as ml
 from pvserve import preprocessing as pp
@@ -35,6 +36,21 @@ result = pp.calculate_rmse(dataset=result,
                            cols_predict=COLS_IV_P,
                            cols_y=COLS_IV_Y)
 
+client_ml.upload_dataframe(result, "Predictions", "predictions.csv")
+
+rmse = result.rmse.mean()
+isc = result.Isc_meta.mean()
+
+print(rmse)
+print(isc)
+print(rmse * isc)
+
+
+max = result.iloc[result.rmse.idxmax()]
+print(max.rmse)
+print(max.Isc_meta)
+print(max.rmse * max.Isc_meta)
+#exit()
 fig = pp.plot_scatter_bins(x=result['E eff'].values, 
                            y=result['rmse'].values, 
                            xlabel='Einstrahlung',
@@ -42,15 +58,22 @@ fig = pp.plot_scatter_bins(x=result['E eff'].values,
                            xbinwidth=50,
                            ybinwidth=0.01)
 
-client_ml.upload_plot(fig, "Test Error", "test.png")
-exit()
+client_ml.upload_plot(fig, "Modell Error", "model_rmse.png")
 
 result = result.sort_values(['rmse'])
 
-fig = pp.plot_curves(curves=result.head(20),
+fig = pp.plot_curves(curves=result.head(4),
                      index=INDEXES,
                      cols_source=COLS_IV_X,
                      cols_target=COLS_IV_Y,
                      cols_predict=COLS_IV_P)
 
-client_ml.upload_plot(fig, "Top 20 Predictions", "top20_prediction.png")
+client_ml.upload_plot(fig, "Top 4 Predictions", "top_prediction.png")
+
+fig = pp.plot_curves(curves=result.tail(4),
+                     index=INDEXES,
+                     cols_source=COLS_IV_X,
+                     cols_target=COLS_IV_Y,
+                     cols_predict=COLS_IV_P)
+
+client_ml.upload_plot(fig, "Worst 4 Predictions", "worst_prediction.png")

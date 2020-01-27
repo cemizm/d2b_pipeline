@@ -1,110 +1,117 @@
+import pvserve
+import argparse
 import logging, os
 
-from pvserve import mlcycle as ml
-from pvserve import preprocessing as pp
-
 logging.disable(logging.WARNING)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-IV_COLS = 20
+print("--------------------- Parse Arguments ----------------------")
+parser = argparse.ArgumentParser()
+parser.add_argument("--experiment", "-e", required=True, type=int, help="set experiment to train")
+args = parser.parse_args()
 
-INDEXES, COLS = pp.get_iv_cols(IV_COLS)
+exp = args.experiment
 
-COLS_IV_X = [c + '_x' for c in COLS] # Dark Curve Labels
-COLS_IV_Y = [c + '_y' for c in COLS] # Bright Curve Labels
-COLS_IV_P = [c + '_p' for c in COLS] # Predict Curve Labels
-COLS_IV_T = [*COLS_IV_X, *COLS_IV_Y] # Ground Truth Curve Labels
+print("Experiment:\t\t\t{}".format(exp))
 
-COLS_X = ["Temp", "Irr", *COLS_IV_X]
-COLS_Y = [*COLS_IV_Y, 'Uoc_y']
-COLS_P = [*COLS_IV_P, 'Uoc_p']
+param_layers = None
+param_neurons = None
+param_epochs = None
+param_init = None
 
-PARAM_HIDDEN_LAYERS = 2
-PARAM_PER_LAYER_FACTOR = 2
-PARAM_EPOCHS = 2000
-PARAM_BATCH_SIZE = 10
+x_cols = None
+y_cols = None
+name = "E{}".format(exp)
 
-PARAM_OPTIMIZER = 'rmsprop'
+if exp == 1:
+    param_layers = [1]
+    param_neurons = [0.3, 0.6, 0.9, 1.2]
+    param_epochs = [20, 50, 100, 150, 200]
+    param_init = [1, .6, 'tanh', 100, 'rmsprop', 0.001]
+
+    x_cols = ['Env','Features_x']
+    y_cols = ['Features_y']
+
+elif exp == 2:
+    param_layers = [1, 2]
+    param_neurons = [0.3, 0.6, 0.9, 1.2]
+    param_epochs = [100, 200, 500, 1000]
+    param_init = [2, .6, 'tanh', 200, 'rmsprop', 0.001]
+
+    x_cols = ['Env','IV_x']
+    y_cols = ['Features_y']
+
+elif exp == 3:
+    param_layers = [1, 2]
+    param_neurons = [0.9, 1.2, 1.5, 1.8]
+    param_epochs = [200, 500, 1000, 1500, 2000]
+    param_init = [2, .9, 'tanh', 1500, 'rmsprop', 0.001]
+
+    x_cols = ['Env','IV_x']
+    y_cols = ['IV_y']
+
+if x_cols is None or y_cols is None:
+    print("Invalid Experiment")
+    exit()
 
 print("------------------ Download from MLCycle -------------------")
 
-client_ml = ml.Client()
+client_ml = pvserve.mlcycle.Client()
 
-dataset = client_ml.download_dataframe("dataset.csv", low_memory=False)
+test = client_ml.download_dataframe("dataset_test.csv", index_col=[0, 1, 2], header=[0, 1])
+validate = client_ml.download_dataframe("dataset_validate.csv", index_col=[0, 1, 2], header=[0, 1])
+train = client_ml.download_dataframe("dataset_train.csv", index_col=[0, 1, 2], header=[0, 1])
 
-ds_train, ds_test = pp.train_test_split(dataset, test_size=0.2)
+print("Dataset Test:\t\t\t{}".format(test.shape[0]))
+print("Dataset Validate:\t\t{}".format(validate.shape[0]))
+print("Dataset Train:\t\t\t{}".format(train.shape[0]))
 
-print("Train Dataset:\t\t\t{}".format(ds_train.shape[0]))
-print("Test Dataset:\t\t\t{}".format(ds_test.shape[0]))
+print("-------------------------- Task ----------------------------")
 
-print("----------------------- Build model ------------------------")
+print("Prepare Inputs...")
+val_x = validate[x_cols]
+val_y = validate[y_cols]
 
-model = pp.build_model(input_size=len(COLS_X), 
-                       output_size=len(COLS_Y),
-                       hidden_layer=PARAM_HIDDEN_LAYERS,
-                       neurons_per_layer=(len(COLS_X) * PARAM_PER_LAYER_FACTOR),
-                       optimizer=PARAM_OPTIMIZER,
-                       activation='tanh')
+train_x = train[x_cols]
+train_y = train[y_cols]
 
-model.summary()
-print()
+def train_model(layers, neurons, activation, epochs, optimizer, lr, verbose=0):
+    model = pvserve.train.model_build(train_x.shape[1], 
+                                      train_y.shape[1], 
+                                      layers, 
+                                      neurons, 
+                                      lr=lr,
+                                      activation=activation, 
+                                      optimizer=optimizer)
+    
+    pvserve.train.model_fit(model, train_x, train_y, (val_x, val_y), epochs, 20, verbose=verbose)
 
-print("Batch Size:\t\t\t{}".format(PARAM_BATCH_SIZE))
-print("Training Epochs:\t\t{}".format(PARAM_EPOCHS))
-
-history = model.fit(ds_train[COLS_X], 
-                    ds_train[COLS_Y], 
-                    epochs=PARAM_EPOCHS, 
-                    batch_size=PARAM_BATCH_SIZE, 
-                    shuffle=True, 
-                    validation_split=0.25, 
-                    verbose=0)
-
-client_ml.upload_model(model, "Tensorflow Model", "model.h5")
-
-fig = pp.plot_history(history)
-client_ml.upload_plot(fig, "Model loss", "model_loss.png")
-
-print()
-print("------------------------ Error Plot ------------------------")
-
-result = pp.predict(model=model, 
-                    dataset=ds_test,
-                    cols_x=COLS_X,
-                    cols_predict=COLS_P)
-
-result = pp.calculate_rmse(dataset=result, 
-                           cols_predict=COLS_IV_P,
-                           cols_y=COLS_IV_Y)
-
-fig = pp.plot_scatter_bins(x=result['E eff'].values, 
-                           y=result['rmse'].values, 
-                           xlabel='Einstrahlung',
-                           ylabel='RMSE',
-                           xbinwidth=50,
-                           ybinwidth=0.001)
-
-client_ml.upload_plot(fig, "RMSE", "model_rmse.png")
-
-print("----------------------- Predictions ------------------------")
-
-samples = result.sort_values(['rmse'])
-top20 = samples.head(20)
-worst20 = samples.tail(20)
-
-fig = pp.plot_curves(curves=top20,
-                     index=INDEXES,
-                     cols_source=COLS_IV_X,
-                     cols_target=COLS_IV_Y,
-                     cols_predict=COLS_IV_P)
-
-client_ml.upload_plot(fig, "Top 20 Predictions", "top20_prediction.png")
+    return model
 
 
-fig = pp.plot_curves(curves=worst20,
-                     index=INDEXES,
-                     cols_source=COLS_IV_X,
-                     cols_target=COLS_IV_Y,
-                     cols_predict=COLS_IV_P)
+def optimizer_train(layers, neurons, activation, epochs, optimizer, lr):
+    model = train_model(layers, neurons, activation, epochs, optimizer, lr)
 
-client_ml.upload_plot(fig, "Worst 20 Predictions", "worst20_prediction.png")
+    return pvserve.train.model_evaluate(model, val_x, val_y, verbose=0)[0]
+
+print("Prepare Hyperparameter...")
+params = {
+    'Interneschichten': param_layers,
+    'Neuronenfaktor': param_neurons,
+    'Aktivierungsfunktion': ['sigmoid', 'tanh'],
+    'Trainingsepochen': param_epochs,
+    'Optimierungsfunktion': ['adam', 'adagrad', 'rmsprop'],
+    'Lernrate': [0.00001, 0.0001, 0.001, 0.01]
+}
+
+print("Start optimization...")
+history = pvserve.train.optimize_run(params, param_init, optimizer_train)
+
+print("Build final Model...")
+model = train_model(*history.head(1).values[0][:-2], verbose=1)
+
+print("--------------- Upload Optimization results ----------------")
+
+client_ml.upload_model(model, 'Tensorflow Model E{}'.format(exp), 'model_e{}.h5'.format(exp))
+
+client_ml.upload_dataframe(history, 'Optimization History E{}'.format(exp), 'opt_e{}.csv'.format(exp))

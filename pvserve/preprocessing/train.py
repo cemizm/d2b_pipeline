@@ -115,7 +115,7 @@ def plot_curves(curves, index, cols_source, cols_target, cols_predict):
 
     fig, axes = plt.subplots(nrows=int(fig_count/2), 
                              ncols=2, 
-                             figsize=(18, fig_count*4), 
+                             figsize=(18, fig_count*3), 
                              sharey=True, 
                              sharex=False)
     ax = 0
@@ -124,11 +124,11 @@ def plot_curves(curves, index, cols_source, cols_target, cols_predict):
         axis = axes[int(ax/2)][ax%2]
 
         df = pd.DataFrame(index=index)
-        df['source'] = row[cols_source].values
+        #df['source'] = row[cols_source].values
         df['target'] = row[cols_target].values
         df['predict'] = row[cols_predict].values
         
-        df.plot(marker='.', ax = axis, ylim=(0, 1))
+        df.plot(marker='.', ax = axis, ylim=(0, 1), linewidth=2, markersize=10)
         
         ax += 1
     

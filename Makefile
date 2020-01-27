@@ -1,3 +1,7 @@
+DOCKERRUN	= 
+PVSERVEPY	= docker run -it --rm -v $(PWD)/:/src pvserve:runtime python
+#PVSERVEPY	= nvidia-docker run -it --rm -v $(PWD)/:/src pvserve:runtime python
+
 .PHONY:image
 image:
 	@docker build -t pvserve:runtime -f dockerfiles/run.dockerfile ./dockerfiles/
@@ -5,33 +9,47 @@ image:
 
 .PHONY:ingest
 ingest:
-	@docker run -it --rm -v $(PWD)/:/src pvserve:runtime python ingest.py
+	@$(PVSERVEPY) ingest.py
 
-.PHONY:explore
-explore:
-	@docker run -it --rm -v $(PWD)/:/src pvserve:runtime python explore.py
+.PHONY:clean
+clean:
+	@$(PVSERVEPY) clean.py
 
 .PHONY:prepare
 prepare:
-	@docker run -it --rm -v $(PWD)/:/src pvserve:runtime python prepare.py
+	@$(PVSERVEPY) prepare.py
 
-.PHONY:train
-train:
-	@docker run -it --rm -v $(PWD)/:/src pvserve:runtime python train.py
+.PHONY:train1
+train1:
+	docker run -d --rm --name e1 -v $(PWD)/:/src pvserve:runtime python train.py -e 1
+
+.PHONY:train2
+train2:
+	docker run -d --rm --name e2 -v $(PWD)/:/src pvserve:runtime python train.py -e 2
+
+.PHONY:train3
+train3:
+	docker run -d --rm --name e3 -v $(PWD)/:/src pvserve:runtime python train.py -e 3
 
 .PHONY:validate
 validate:
-	@docker run -it --rm -v $(PWD)/:/src pvserve:runtime python validate.py
+	@$(PVSERVEPY) validate.py
 
 .PHONY:all
-all: ingest explore prepare train 
+all: ingest clean prepare train1 train2 train3 validate
 
 .PHONY:jupyter
-jupyter:
+jupyter: jupyter-srv jupyter-token
+
+.PHONY:jupyter-srv
+jupyter-srv:
 	@docker run --rm -d --name pvservnb -p 10001:8888 -v $(PWD):/home/jovyan/work pvserve:notebook
 	@printf "Wait for Notebook Server start "
-	@while [[ "$$(curl -s -o /dev/null -w ''%{http_code}'' localhost:10001/login)" != "200" ]]; do printf "."; sleep 2; done
+	@sleep 3s
 	@echo "done"
+
+.PHONY:jupyter-token
+jupyter-token:
 	@docker exec pvservnb jupyter notebook list | grep 'http' | sed 's/0.0.0.0:8888/localhost:10001/g'
 
 .PHONY:stop

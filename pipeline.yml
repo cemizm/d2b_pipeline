@@ -5,12 +5,12 @@ steps:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
     command: python ingest.py
-- name: Exploration
-  docker:
+- name: Daten bereinigen
+    docker:
     buildConfiguration:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
-    command: python explore.py
+    command: python clean.py
 - name: Vorverarbeitung
   docker:
     buildConfiguration:

@@ -1,13 +1,17 @@
-from pvserve import smartmonitoring as sm
-from pvserve import mlcycle as ml
-from pvserve import moduldb as mdb
+import pvserve
 
 import pandas as pd
 import os
 
-client_sm = sm.Client()
-client_ml = ml.Client()
-client_mdb = mdb.Client()
+TP_B = pvserve.smartmonitoring.SM_TYPE_BRIGHT
+TP_D = pvserve.smartmonitoring.SM_TYPE_DARK
+TP_PLANT = pvserve.smartmonitoring.SM_TYPE_PLANT
+TP_STRING = pvserve.smartmonitoring.SM_TYPE_STRING
+TP_MODUL = pvserve.smartmonitoring.SM_TYPE_MODUL
+
+client_sm = pvserve.smartmonitoring.Client()
+client_ml = pvserve.mlcycle.Client()
+client_mdb = pvserve.moduldb.Client()
 
 print()
 print("---------------- Loading Observed Objects ------------------")
@@ -17,8 +21,7 @@ oo = client_sm.get_objects()
 metadata = None
 curves = {}
 
-oo_data = oo[ (oo.type == sm.SM_TYPE_BRIGHT) | 
-              (oo.type == sm.SM_TYPE_DARK) ]
+oo_data = oo[ (oo.type == TP_B) | (oo.type == TP_D) ]
 
 print("Observed Objects:\t\t{}".format(len(oo.index)))
 print("IV Curve Objects:\t\t{}".format(len(oo_data.index)))
@@ -41,13 +44,8 @@ for index, row in oo_data.iterrows():
     else:
         curves[row.type] = curves[row.type].append(df)
 
-dark = curves[sm.SM_TYPE_DARK]
-bright = curves[sm.SM_TYPE_BRIGHT]
-
-dark[sm.SM_CURVE_I] = dark[sm.SM_CURVE_I].multiply(-1, axis="index")
-
-dark['Uoc'] = dark[sm.SM_CURVE_U].max(axis=1)
-dark['Isc'] = dark[sm.SM_CURVE_I].max(axis=1)
+dark = curves[TP_D]
+bright = curves[TP_B]
 
 dark_count = len(dark.index)
 bright_count = len(bright.index)
@@ -59,8 +57,8 @@ print("-------------------- Loading Metadata ----------------------")
 
 metadata = client_sm.get_meta_dataframe_workaround()
 
-plants = oo[oo.type == sm.SM_TYPE_PLANT][['name']]
-strings = oo[(oo.type == sm.SM_TYPE_STRING) | (oo.type == sm.SM_TYPE_MODUL)][['name', 'parent']]
+plants = oo[oo.type == TP_PLANT][['name']]
+strings = oo[(oo.type == TP_STRING) | (oo.type == TP_MODUL)][['name', 'parent']]
 strings = strings.reset_index().set_index(['parent'])
 header = strings.join(plants, lsuffix="_string", rsuffix="_plant")
 
@@ -97,6 +95,11 @@ string_count = len(strings.index)
 print("Total Plants:\t\t\t{}".format(plants_count))
 print("Total Strings:\t\t\t{}".format(string_count))
 
+print("-------------------- Consolidate Data ----------------------")
+
+bright = pvserve.ingestion.consolidate_bright(bright, meta)
+dark = pvserve.ingestion.consolidate_dark(dark, meta)
+
 print("-------------------- Upload to MLCycle ---------------------")
 
 client_ml.add_metrics({
@@ -106,6 +109,5 @@ client_ml.add_metrics({
     'Dark IV-Curves': dark_count
 })
 
-client_ml.upload_dataframe(meta, 'Metadata', 'metadata.csv')
 client_ml.upload_dataframe(dark, 'Dark IV-Curves (raw)', 'raw_dark.csv')
 client_ml.upload_dataframe(bright, 'Bright IV-Curves (raw)', 'raw_bright.csv')
