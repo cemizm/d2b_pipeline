@@ -6,7 +6,7 @@ steps:
         dockerfile: run.dockerfile
     command: python ingest.py
 - name: Daten bereinigen
-    docker:
+  docker:
     buildConfiguration:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
@@ -22,4 +22,4 @@ steps:
     buildConfiguration:
         context: ./dockerfiles/
         dockerfile: run.dockerfile
-    command: python train.py
+    command: python train.py -e 3
